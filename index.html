@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Vocaloid Food Hunt</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #222; color: white; font-family: Arial; }
+  canvas { display: block; margin: auto; background: #333; }
+</style>
+</head>
+<body>
+
+<canvas id="game" width="800" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+// jugador
+let player = { x: 50, y: 50, size: 20, speed: 3 };
+
+// controles
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+// objetos (comida)
+let items = [];
+let totalItems = 20;
+
+// paredes (colisión)
+let walls = [
+  {x:200,y:100,w:200,h:20},
+  {x:400,y:300,w:20,h:150},
+  {x:100,y:250,w:150,h:20}
+];
+
+// tiempo
+let time = 180;
+let score = 0;
+
+// personaje
+let character = "teto"; // cambia a "miku"
+
+// generar comida
+function spawnItems() {
+  items = [];
+  for (let i = 0; i < totalItems; i++) {
+    items.push({
+      x: Math.random()*760,
+      y: Math.random()*460,
+      size: 10
+    });
+  }
+}
+
+// colisión simple
+function isColliding(a, b) {
+  return a.x < b.x + b.w &&
+         a.x + a.size > b.x &&
+         a.y < b.y + b.h &&
+         a.y + a.size > b.y;
+}
+
+// mover jugador
+function movePlayer() {
+  let oldX = player.x;
+  let oldY = player.y;
+
+  if (keys["ArrowUp"]) player.y -= player.speed;
+  if (keys["ArrowDown"]) player.y += player.speed;
+  if (keys["ArrowLeft"]) player.x -= player.speed;
+  if (keys["ArrowRight"]) player.x += player.speed;
+
+  // colisión con paredes
+  for (let wall of walls) {
+    if (isColliding(player, wall)) {
+      player.x = oldX;
+      player.y = oldY;
+    }
+  }
+}
+
+// recoger comida
+function collectItems() {
+  items = items.filter(item => {
+    let dist = Math.hypot(player.x - item.x, player.y - item.y);
+    if (dist < 15) {
+      score++;
+      return false;
+    }
+    return true;
+  });
+}
+
+// dibujar
+function draw() {
+  ctx.clearRect(0,0,800,500);
+
+  // jugador
+  ctx.fillStyle = character === "teto" ? "pink" : "cyan";
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+
+  // comida
+  ctx.fillStyle = "yellow";
+  items.forEach(item => {
+    ctx.fillRect(item.x, item.y, item.size, item.size);
+  });
+
+  // paredes
+  ctx.fillStyle = "gray";
+  walls.forEach(w => {
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+  });
+
+  // UI
+  ctx.fillStyle = "white";
+  ctx.fillText("Tiempo: " + time, 10, 20);
+  ctx.fillText("Score: " + score + "/20", 10, 40);
+}
+
+// loop
+function update() {
+  movePlayer();
+  collectItems();
+
+  if (score >= 20) {
+    alert("GANASTE 🎉");
+    resetGame();
+  }
+
+  draw();
+}
+
+// reiniciar
+function resetGame() {
+  score = 0;
+  time = 180;
+  spawnItems();
+}
+
+// tiempo
+setInterval(() => {
+  time--;
+  if (time <= 0) {
+    alert("PERDISTE 😢");
+    resetGame();
+  }
+}, 1000);
+
+// iniciar
+spawnItems();
+setInterval(update, 1000/60);
+</script>
+
+</body>
+</html>
