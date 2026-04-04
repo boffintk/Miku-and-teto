@@ -14,7 +14,6 @@ body { margin: 0; overflow: hidden; }
 }
 button { padding: 10px 20px; font-size: 20px; margin: 10px; }
 
-/* joystick */
 #joystick {
   position: absolute;
   bottom: 40px;
@@ -68,7 +67,6 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // luz
   let light = new THREE.DirectionalLight(0xffffff,1);
   light.position.set(5,10,5);
   scene.add(light);
@@ -88,9 +86,43 @@ function init() {
   );
   player.position.y = 0.5;
   scene.add(player);
+
+  // 🏠 CUARTO
+  let walls = [];
+  function createWall(x,y,z,w,h,d){
+    let wall = new THREE.Mesh(
+      new THREE.BoxGeometry(w,h,d),
+      new THREE.MeshStandardMaterial({color: 0x888888})
+    );
+    wall.position.set(x,y,z);
+    scene.add(wall);
+    walls.push(wall);
+  }
+
+  createWall(0,1,-10,20,2,1);
+  createWall(0,1,10,20,2,1);
+  createWall(-10,1,0,1,2,20);
+  createWall(10,1,0,1,2,20);
+
+  // 🥖 BAGUETTES
+  baguettes = [];
+  for (let i = 0; i < 20; i++) {
+    let baguette = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2,0.2,1,8),
+      new THREE.MeshStandardMaterial({color: 0xffcc66})
+    );
+    baguette.rotation.z = Math.PI/2;
+    baguette.position.set(
+      Math.random()*16-8,
+      0.5,
+      Math.random()*16-8
+    );
+    scene.add(baguette);
+    baguettes.push(baguette);
+  }
 }
 
-// 🎮 JOYSTICK (movimiento tipo Roblox)
+// joystick
 let stick = document.getElementById("stick");
 let joystick = document.getElementById("joystick");
 
@@ -121,18 +153,17 @@ joystick.addEventListener("touchend", () => {
   moveY = 0;
 });
 
-// 🖱️ ROTAR CÁMARA
+// cámara
 let yaw = 0;
 let pitch = 0;
 
 document.addEventListener("mousemove", e => {
   yaw -= e.movementX * 0.002;
   pitch -= e.movementY * 0.002;
-
   pitch = Math.max(-1.5, Math.min(1.5, pitch));
 });
 
-// actualizar
+// update
 function update() {
   let speed = 0.1;
 
@@ -142,7 +173,16 @@ function update() {
   player.position.x += (dirX * moveY + dirZ * moveX) * speed;
   player.position.z += (dirZ * moveY - dirX * moveX) * speed;
 
-  // cámara sigue y gira
+  // recoger baguettes
+  baguettes = baguettes.filter(b => {
+    let dist = player.position.distanceTo(b.position);
+    if (dist < 1) {
+      scene.remove(b);
+      return false;
+    }
+    return true;
+  });
+
   camera.position.x = player.position.x - Math.sin(yaw)*5;
   camera.position.z = player.position.z - Math.cos(yaw)*5;
   camera.position.y = 2 + pitch*2;
