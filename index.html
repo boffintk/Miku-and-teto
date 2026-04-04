@@ -21,57 +21,52 @@ body { margin: 0; overflow: hidden; }
   z-index: 10;
 }
 
-/* JOYSTICK */
-#joystick {
-  position: absolute;
-  bottom: 40px;
-  left: 40px;
-  width: 100px;
-  height: 100px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 50%;
-}
-
-#stick {
-  width: 40px;
-  height: 40px;
-  background: white;
-  border-radius: 50%;
-  position: absolute;
-  left: 30px;
-  top: 30px;
-}
-
-/* PAUSE */
-#pauseBtn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 10px;
-  font-size: 18px;
-  z-index: 5;
-}
-
-#pauseMenu {
-  position: absolute;
-  top: 40%;
-  left: 40%;
-  background: rgba(0,0,0,0.8);
-  padding: 20px;
-  display: none;
-  color: white;
-  z-index: 6;
-}
-
 /* HUD */
 #timer {
   position: absolute;
   top: 10px;
   left: 10px;
   color: white;
-  font-size: 20px;
+  font-size: 18px;
   z-index: 5;
 }
+
+/* STAMINA */
+#staminaBar {
+  position: absolute;
+  top: 40px;
+  left: 10px;
+  width: 150px;
+  height: 10px;
+  background: gray;
+  z-index: 5;
+}
+#staminaFill {
+  width: 100%;
+  height: 100%;
+  background: cyan;
+}
+
+/* PAUSE / SHOP */
+#pauseBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+}
+
+#pauseMenu {
+  position: absolute;
+  top: 35%;
+  left: 40%;
+  background: rgba(0,0,0,0.85);
+  padding: 20px;
+  color: white;
+  display: none;
+  z-index: 6;
+}
+button { margin: 5px; padding: 10px; }
+
 </style>
 </head>
 
@@ -87,84 +82,124 @@ body { margin: 0; overflow: hidden; }
 <div id="pauseMenu">
   <button onclick="resume()">Play</button>
   <button onclick="restart()">Restart</button>
-  <button onclick="alert('Shop próximamente')">Shop</button>
+  <button onclick="shop()">Shop</button>
 </div>
 
-<div id="timer">Tiempo: 180 | Baguettes: 0</div>
-
-<div id="joystick"><div id="stick"></div></div>
+<div id="timer">Tiempo: 180 | Score: 0 | Onions: 0</div>
+<div id="staminaBar"><div id="staminaFill"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 
 <script>
-let scene, camera, renderer, player;
-let moveX = 0, moveY = 0;
-let paused = false;
-let time = 180;
-let score = 0;
+let scene,camera,renderer;
 
-let walls = [];
-let baguettes = [];
+let player, teto;
+let walls=[], items=[];
 
-/* CAMERA */
-let yaw = 0;
-let pitch = 0;
-let camDistance = 5;
-let isDragging = false;
-let lastX, lastY;
+let yaw=0,pitch=0;
+let isDragging=false,lastX,lastY;
+
+let time=180;
+let score=0;
+let onions=0;
+
+let stamina=100;
+let sprinting=false;
+
+let keys={};
+
+let paused=false;
 
 /* START */
 function startGame(){
-  document.getElementById("menu").style.display = "none";
+  document.getElementById("menu").style.display="none";
   init();
   animate();
 }
 
 /* PAUSE */
 function togglePause(){
-  paused = !paused;
-  document.getElementById("pauseMenu").style.display = paused ? "block" : "none";
+  paused=!paused;
+  document.getElementById("pauseMenu").style.display=paused?"block":"none";
 }
-function resume(){
-  paused = false;
-  document.getElementById("pauseMenu").style.display = "none";
-}
-function restart(){
-  location.reload();
+function resume(){paused=false;document.getElementById("pauseMenu").style.display="none";}
+function restart(){location.reload();}
+
+/* SHOP */
+function shop(){
+  if(score>=10){
+    score-=10;
+    onions++;
+    alert("Compraste CEBOLLÍN con Miku 🌱");
+  } else {
+    alert("Necesitas 10 baguettes");
+  }
 }
 
 /* INIT */
 function init(){
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87CEEB);
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x87CEEB);
 
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,1000);
 
-  renderer = new THREE.WebGLRenderer();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer=new THREE.WebGLRenderer();
+  renderer.setSize(innerWidth,innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  scene.add(new THREE.AmbientLight(0xffffff,0.6));
 
-  let light = new THREE.DirectionalLight(0xffffff, 1);
+  let light=new THREE.DirectionalLight(0xffffff,1);
   light.position.set(5,10,5);
   scene.add(light);
 
   /* FLOOR */
-  let floor = new THREE.Mesh(
+  let floor=new THREE.Mesh(
     new THREE.PlaneGeometry(50,50),
-    new THREE.MeshStandardMaterial({color: 0x55aa55})
+    new THREE.MeshStandardMaterial({color:0x55aa55})
   );
-  floor.rotation.x = -Math.PI/2;
+  floor.rotation.x=-Math.PI/2;
   scene.add(floor);
 
   /* PLAYER */
-  player = new THREE.Mesh(
+  player=new THREE.Mesh(
     new THREE.BoxGeometry(1,1,1),
-    new THREE.MeshStandardMaterial({color: 0xff69b4})
+    new THREE.MeshStandardMaterial({color:0xff69b4})
   );
-  player.position.y = 0.5;
+  player.position.y=0.5;
   scene.add(player);
+
+  /* TETO STYLE CHARACTER (simple humanoid) */
+  teto=new THREE.Group();
+
+  let head=new THREE.Mesh(
+    new THREE.BoxGeometry(0.8,0.8,0.8),
+    new THREE.MeshStandardMaterial({color:0xffc0cb})
+  );
+  head.position.y=1.5;
+
+  let body=new THREE.Mesh(
+    new THREE.BoxGeometry(0.6,0.8,0.4),
+    new THREE.MeshStandardMaterial({color:0xff69b4})
+  );
+  body.position.y=0.8;
+
+  let tail1=new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05,0.05,1),
+    new THREE.MeshStandardMaterial({color:0x9999ff})
+  );
+  tail1.position.set(-0.3,1.6,-0.2);
+  tail1.rotation.z=0.5;
+
+  let tail2=tail1.clone();
+  tail2.position.x=0.3;
+
+  teto.add(head);
+  teto.add(body);
+  teto.add(tail1);
+  teto.add(tail2);
+
+  scene.add(teto);
 
   /* WALLS */
   createWall(0,1,-10,20,2,1);
@@ -172,16 +207,15 @@ function init(){
   createWall(-10,1,0,1,2,20);
   createWall(10,1,0,1,2,20);
 
-  /* BAGUETTES */
+  /* ITEMS */
   for(let i=0;i<20;i++){
-    let b = new THREE.Mesh(
+    let b=new THREE.Mesh(
       new THREE.CylinderGeometry(0.2,0.2,1,8),
-      new THREE.MeshStandardMaterial({color: 0xffcc66})
+      new THREE.MeshStandardMaterial({color:0xffcc66})
     );
-    b.rotation.z = Math.PI/2;
     b.position.set(Math.random()*16-8,0.5,Math.random()*16-8);
     scene.add(b);
-    baguettes.push(b);
+    items.push(b);
   }
 
   updateCamera();
@@ -189,54 +223,21 @@ function init(){
 
 /* WALL */
 function createWall(x,y,z,w,h,d){
-  let wall = new THREE.Mesh(
+  let wall=new THREE.Mesh(
     new THREE.BoxGeometry(w,h,d),
-    new THREE.MeshStandardMaterial({color: 0x888888})
+    new THREE.MeshStandardMaterial({color:0x888888})
   );
-
   wall.position.set(x,y,z);
-  wall.userData.size = {w,h,d};
-
+  wall.userData={w,h,d};
   scene.add(wall);
   walls.push(wall);
 }
 
-/* JOYSTICK */
-let stick = document.getElementById("stick");
-let joystick = document.getElementById("joystick");
-
-joystick.addEventListener("touchmove", e=>{
-  let rect = joystick.getBoundingClientRect();
-  let t = e.touches[0];
-
-  let x = t.clientX - rect.left - 50;
-  let y = t.clientY - rect.top - 50;
-
-  let dist = Math.sqrt(x*x + y*y);
-  if(dist>40){
-    x*=40/dist;
-    y*=40/dist;
-  }
-
-  stick.style.left = (x+30)+"px";
-  stick.style.top = (y+30)+"px";
-
-  moveX = x/40;
-  moveY = y/40;
-});
-
-joystick.addEventListener("touchend", ()=>{
-  stick.style.left="30px";
-  stick.style.top="30px";
-  moveX=0;
-  moveY=0;
-});
-
 /* CAMERA DRAG */
 document.addEventListener("mousedown",(e)=>{
-  isDragging = true;
-  lastX = e.clientX;
-  lastY = e.clientY;
+  isDragging=true;
+  lastX=e.clientX;
+  lastY=e.clientY;
 });
 
 document.addEventListener("mouseup",()=>isDragging=false);
@@ -244,80 +245,101 @@ document.addEventListener("mouseup",()=>isDragging=false);
 document.addEventListener("mousemove",(e)=>{
   if(!isDragging) return;
 
-  let dx = e.clientX - lastX;
-  let dy = e.clientY - lastY;
+  yaw -= (e.clientX-lastX)*0.005;
+  pitch -= (e.clientY-lastY)*0.005;
+  pitch=Math.max(-1.2,Math.min(1.2,pitch));
 
-  yaw -= dx * 0.005;
-  pitch -= dy * 0.005;
+  lastX=e.clientX;
+  lastY=e.clientY;
+});
 
-  pitch = Math.max(-1.2, Math.min(1.2, pitch));
-
-  lastX = e.clientX;
-  lastY = e.clientY;
+/* KEYS */
+document.addEventListener("keydown",e=>{
+  keys[e.key]=true;
+  if(e.key==="Shift") sprinting=true;
+});
+document.addEventListener("keyup",e=>{
+  keys[e.key]=false;
+  if(e.key==="Shift") sprinting=false;
 });
 
 /* COLLISION */
-function checkCollision(x,z){
+function collide(x,z){
   for(let w of walls){
-    let s = w.userData.size;
-
-    let dx = Math.abs(x - w.position.x);
-    let dz = Math.abs(z - w.position.z);
-
-    if(dx < s.w/2 + 0.5 && dz < s.d/2 + 0.5){
-      return true;
-    }
+    let dx=Math.abs(x-w.position.x);
+    let dz=Math.abs(z-w.position.z);
+    if(dx<w.userData.w/2+0.5 && dz<w.userData.d/2+0.5) return true;
   }
   return false;
 }
 
 /* UPDATE */
 function update(){
+
   if(paused) return;
 
-  let speed = 0.08;
+  /* STAMINA */
+  if(sprinting && stamina>0){
+    stamina-=1.2;
+  } else {
+    stamina+=0.5;
+  }
+  stamina=Math.max(0,Math.min(100,stamina));
 
-  let forwardX = Math.sin(yaw);
-  let forwardZ = Math.cos(yaw);
+  let speed=sprinting?0.15:0.08;
 
-  let rightX = Math.cos(yaw);
-  let rightZ = -Math.sin(yaw);
+  let forwardX=Math.sin(yaw);
+  let forwardZ=Math.cos(yaw);
+  let rightX=Math.cos(yaw);
+  let rightZ=-Math.sin(yaw);
 
-  /* ✅ CONTROLES ARREGLADOS (NO INVERTIDOS) */
-  let newX = player.position.x + (rightX * moveX + forwardX * moveY) * speed;
-  let newZ = player.position.z + (rightZ * moveX + forwardZ * moveY) * speed;
+  let mx=0,mz=0;
 
-  if(!checkCollision(newX,newZ)){
-    player.position.x = newX;
-    player.position.z = newZ;
+  if(keys["w"]) {mx+=forwardX; mz+=forwardZ;}
+  if(keys["s"]) {mx-=forwardX; mz-=forwardZ;}
+  if(keys["a"]) {mx-=rightX; mz-=rightZ;}
+  if(keys["d"]) {mx+=rightX; mz+=rightZ;}
+
+  let nx=player.position.x+mx*speed;
+  let nz=player.position.z+mz*speed;
+
+  if(!collide(nx,nz)){
+    player.position.x=nx;
+    player.position.z=nz;
   }
 
   /* BAGUETTES */
-  baguettes = baguettes.filter(b=>{
-    if(player.position.distanceTo(b.position)<1){
-      scene.remove(b);
+  items=items.filter(i=>{
+    if(player.position.distanceTo(i.position)<1){
+      scene.remove(i);
       score++;
       return false;
     }
     return true;
   });
 
-  document.getElementById("timer").innerText =
-    "Tiempo: "+time+" | Baguettes: "+score;
+  /* HUD */
+  document.getElementById("timer").innerText=
+  `Tiempo:${time} | Score:${score} | Onions:${onions}`;
+
+  document.getElementById("staminaFill").style.width=stamina+"%";
+
+  /* TETO FOLLOW */
+  teto.position.copy(player.position);
+  teto.position.y=0;
 
   updateCamera();
 }
 
-/* CAMERA FOLLOW */
+/* CAMERA */
 function updateCamera(){
-  let offsetX = Math.sin(yaw)*camDistance;
-  let offsetZ = Math.cos(yaw)*camDistance;
-  let offsetY = 2 + pitch*2;
+  let ox=Math.sin(yaw)*5;
+  let oz=Math.cos(yaw)*5;
 
   camera.position.set(
-    player.position.x - offsetX,
-    player.position.y + offsetY,
-    player.position.z - offsetZ
+    player.position.x-ox,
+    player.position.y+2+pitch*2,
+    player.position.z-oz
   );
 
   camera.lookAt(player.position);
@@ -325,11 +347,7 @@ function updateCamera(){
 
 /* TIMER */
 setInterval(()=>{
-  if(!paused){
-    time--;
-    document.getElementById("timer").innerText =
-      "Tiempo: "+time+" | Baguettes: "+score;
-  }
+  if(!paused) time--;
 },1000);
 
 /* LOOP */
