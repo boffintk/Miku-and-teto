@@ -31,6 +31,7 @@ body { margin: 0; overflow: hidden; }
   background: rgba(255,255,255,0.2);
   border-radius: 50%;
 }
+
 #stick {
   width: 40px;
   height: 40px;
@@ -105,7 +106,7 @@ let score = 0;
 let walls = [];
 let baguettes = [];
 
-/* CAMERA ROBLOX STYLE */
+/* CAMERA */
 let yaw = 0;
 let pitch = 0;
 let camDistance = 5;
@@ -113,7 +114,7 @@ let isDragging = false;
 let lastX, lastY;
 
 /* START */
-function startGame() {
+function startGame(){
   document.getElementById("menu").style.display = "none";
   init();
   animate();
@@ -133,7 +134,7 @@ function restart(){
 }
 
 /* INIT */
-function init() {
+function init(){
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87CEEB);
 
@@ -165,14 +166,14 @@ function init() {
   player.position.y = 0.5;
   scene.add(player);
 
-  /* WALLS (con tamaño real guardado) */
+  /* WALLS */
   createWall(0,1,-10,20,2,1);
   createWall(0,1,10,20,2,1);
   createWall(-10,1,0,1,2,20);
   createWall(10,1,0,1,2,20);
 
   /* BAGUETTES */
-  for (let i = 0; i < 20; i++) {
+  for(let i=0;i<20;i++){
     let b = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2,0.2,1,8),
       new THREE.MeshStandardMaterial({color: 0xffcc66})
@@ -186,7 +187,7 @@ function init() {
   updateCamera();
 }
 
-/* WALL CREATION (IMPORTANTE PARA COLISIÓN REAL) */
+/* WALL */
 function createWall(x,y,z,w,h,d){
   let wall = new THREE.Mesh(
     new THREE.BoxGeometry(w,h,d),
@@ -194,8 +195,7 @@ function createWall(x,y,z,w,h,d){
   );
 
   wall.position.set(x,y,z);
-
-  wall.userData.size = {w,h,d}; // 👈 clave para colisión real
+  wall.userData.size = {w,h,d};
 
   scene.add(wall);
   walls.push(wall);
@@ -205,7 +205,7 @@ function createWall(x,y,z,w,h,d){
 let stick = document.getElementById("stick");
 let joystick = document.getElementById("joystick");
 
-joystick.addEventListener("touchmove", e => {
+joystick.addEventListener("touchmove", e=>{
   let rect = joystick.getBoundingClientRect();
   let t = e.touches[0];
 
@@ -213,13 +213,13 @@ joystick.addEventListener("touchmove", e => {
   let y = t.clientY - rect.top - 50;
 
   let dist = Math.sqrt(x*x + y*y);
-  if (dist > 40) {
-    x *= 40/dist;
-    y *= 40/dist;
+  if(dist>40){
+    x*=40/dist;
+    y*=40/dist;
   }
 
-  stick.style.left = (x+30) + "px";
-  stick.style.top = (y+30) + "px";
+  stick.style.left = (x+30)+"px";
+  stick.style.top = (y+30)+"px";
 
   moveX = x/40;
   moveY = y/40;
@@ -232,16 +232,14 @@ joystick.addEventListener("touchend", ()=>{
   moveY=0;
 });
 
-/* CAMERA ROBLOX STYLE (drag) */
+/* CAMERA DRAG */
 document.addEventListener("mousedown",(e)=>{
   isDragging = true;
   lastX = e.clientX;
   lastY = e.clientY;
 });
 
-document.addEventListener("mouseup",()=>{
-  isDragging = false;
-});
+document.addEventListener("mouseup",()=>isDragging=false);
 
 document.addEventListener("mousemove",(e)=>{
   if(!isDragging) return;
@@ -258,7 +256,7 @@ document.addEventListener("mousemove",(e)=>{
   lastY = e.clientY;
 });
 
-/* COLLISION REAL */
+/* COLLISION */
 function checkCollision(x,z){
   for(let w of walls){
     let s = w.userData.size;
@@ -285,8 +283,9 @@ function update(){
   let rightX = Math.cos(yaw);
   let rightZ = -Math.sin(yaw);
 
-  let newX = player.position.x + (forwardX*moveY + rightX*moveX)*speed;
-  let newZ = player.position.z + (forwardZ*moveY + rightZ*moveX)*speed;
+  /* ✅ CONTROLES ARREGLADOS (NO INVERTIDOS) */
+  let newX = player.position.x + (rightX * moveX + forwardX * moveY) * speed;
+  let newZ = player.position.z + (rightZ * moveX + forwardZ * moveY) * speed;
 
   if(!checkCollision(newX,newZ)){
     player.position.x = newX;
@@ -309,7 +308,7 @@ function update(){
   updateCamera();
 }
 
-/* CAMERA FOLLOW (ROBLOX ORBIT) */
+/* CAMERA FOLLOW */
 function updateCamera(){
   let offsetX = Math.sin(yaw)*camDistance;
   let offsetZ = Math.cos(yaw)*camDistance;
