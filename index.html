@@ -31,7 +31,6 @@ body { margin: 0; overflow: hidden; }
   z-index: 5;
 }
 
-/* STAMINA */
 #staminaBar {
   position: absolute;
   top: 40px;
@@ -47,7 +46,7 @@ body { margin: 0; overflow: hidden; }
   background: cyan;
 }
 
-/* PAUSE / SHOP */
+/* PAUSE */
 #pauseBtn {
   position: absolute;
   top: 10px;
@@ -65,9 +64,10 @@ body { margin: 0; overflow: hidden; }
   display: none;
   z-index: 6;
 }
-button { margin: 5px; padding: 10px; }
 
+button { margin: 5px; padding: 10px; }
 </style>
+
 </head>
 
 <body>
@@ -82,7 +82,7 @@ button { margin: 5px; padding: 10px; }
 <div id="pauseMenu">
   <button onclick="resume()">Play</button>
   <button onclick="restart()">Restart</button>
-  <button onclick="shop()">Shop</button>
+  <button onclick="shop()">Shop (10🍞)</button>
 </div>
 
 <div id="timer">Tiempo: 180 | Score: 0 | Onions: 0</div>
@@ -92,9 +92,9 @@ button { margin: 5px; padding: 10px; }
 
 <script>
 let scene,camera,renderer;
+let player,teto;
 
-let player, teto;
-let walls=[], items=[];
+let walls=[],items=[];
 
 let yaw=0,pitch=0;
 let isDragging=false,lastX,lastY;
@@ -107,7 +107,6 @@ let stamina=100;
 let sprinting=false;
 
 let keys={};
-
 let paused=false;
 
 /* START */
@@ -130,10 +129,8 @@ function shop(){
   if(score>=10){
     score-=10;
     onions++;
-    alert("Compraste CEBOLLÍN con Miku 🌱");
-  } else {
-    alert("Necesitas 10 baguettes");
-  }
+    alert("Compraste Cebollín con Miku 🌱");
+  } else alert("Necesitas 10 baguettes");
 }
 
 /* INIT */
@@ -169,7 +166,7 @@ function init(){
   player.position.y=0.5;
   scene.add(player);
 
-  /* TETO STYLE CHARACTER (simple humanoid) */
+  /* TETO (con pelo) */
   teto=new THREE.Group();
 
   let head=new THREE.Mesh(
@@ -184,6 +181,18 @@ function init(){
   );
   body.position.y=0.8;
 
+  let hair=new THREE.Mesh(
+    new THREE.BoxGeometry(0.9,0.9,0.9),
+    new THREE.MeshStandardMaterial({color:0x2b2b2b})
+  );
+  hair.position.y=1.7;
+
+  let bangs=new THREE.Mesh(
+    new THREE.BoxGeometry(0.85,0.3,0.9),
+    new THREE.MeshStandardMaterial({color:0x2b2b2b})
+  );
+  bangs.position.set(0,1.55,0.1);
+
   let tail1=new THREE.Mesh(
     new THREE.CylinderGeometry(0.05,0.05,1),
     new THREE.MeshStandardMaterial({color:0x9999ff})
@@ -196,6 +205,8 @@ function init(){
 
   teto.add(head);
   teto.add(body);
+  teto.add(hair);
+  teto.add(bangs);
   teto.add(tail1);
   teto.add(tail2);
 
@@ -233,7 +244,7 @@ function createWall(x,y,z,w,h,d){
   walls.push(wall);
 }
 
-/* CAMERA DRAG */
+/* CAMERA */
 document.addEventListener("mousedown",(e)=>{
   isDragging=true;
   lastX=e.clientX;
@@ -247,6 +258,7 @@ document.addEventListener("mousemove",(e)=>{
 
   yaw -= (e.clientX-lastX)*0.005;
   pitch -= (e.clientY-lastY)*0.005;
+
   pitch=Math.max(-1.2,Math.min(1.2,pitch));
 
   lastX=e.clientX;
@@ -279,11 +291,9 @@ function update(){
   if(paused) return;
 
   /* STAMINA */
-  if(sprinting && stamina>0){
-    stamina-=1.2;
-  } else {
-    stamina+=0.5;
-  }
+  if(sprinting && stamina>0) stamina-=1.2;
+  else stamina+=0.6;
+
   stamina=Math.max(0,Math.min(100,stamina));
 
   let speed=sprinting?0.15:0.08;
@@ -293,22 +303,23 @@ function update(){
   let rightX=Math.cos(yaw);
   let rightZ=-Math.sin(yaw);
 
+  /* ✔ MOVIMIENTO SUAVE CORREGIDO */
   let mx=0,mz=0;
 
-  if(keys["w"]) {mx+=forwardX; mz+=forwardZ;}
-  if(keys["s"]) {mx-=forwardX; mz-=forwardZ;}
-  if(keys["a"]) {mx-=rightX; mz-=rightZ;}
-  if(keys["d"]) {mx+=rightX; mz+=rightZ;}
+  if(keys["w"]) mz+=1;
+  if(keys["s"]) mz-=1;
+  if(keys["a"]) mx-=1;
+  if(keys["d"]) mx+=1;
 
-  let nx=player.position.x+mx*speed;
-  let nz=player.position.z+mz*speed;
+  let nx=player.position.x+(rightX*mx+forwardX*mz)*speed;
+  let nz=player.position.z+(rightZ*mx+forwardZ*mz)*speed;
 
   if(!collide(nx,nz)){
     player.position.x=nx;
     player.position.z=nz;
   }
 
-  /* BAGUETTES */
+  /* ITEMS */
   items=items.filter(i=>{
     if(player.position.distanceTo(i.position)<1){
       scene.remove(i);
@@ -324,14 +335,12 @@ function update(){
 
   document.getElementById("staminaFill").style.width=stamina+"%";
 
-  /* TETO FOLLOW */
   teto.position.copy(player.position);
-  teto.position.y=0;
 
   updateCamera();
 }
 
-/* CAMERA */
+/* CAMERA FOLLOW */
 function updateCamera(){
   let ox=Math.sin(yaw)*5;
   let oz=Math.cos(yaw)*5;
@@ -346,9 +355,7 @@ function updateCamera(){
 }
 
 /* TIMER */
-setInterval(()=>{
-  if(!paused) time--;
-},1000);
+setInterval(()=>{ if(!paused) time--; },1000);
 
 /* LOOP */
 function animate(){
