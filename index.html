@@ -7,12 +7,18 @@
 <style>
 body { margin: 0; overflow: hidden; }
 
-/* MENU INICIO */
+/* MENU */
 #menu {
-  position: absolute; width: 100%; height: 100%;
-  background: black; color: white;
-  display: flex; flex-direction: column;
-  justify-content: center; align-items: center;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: black;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
 }
 
 /* JOYSTICK */
@@ -35,16 +41,16 @@ body { margin: 0; overflow: hidden; }
   top: 30px;
 }
 
-/* BOTON PAUSE */
+/* PAUSE */
 #pauseBtn {
   position: absolute;
   top: 10px;
   right: 10px;
   padding: 10px;
   font-size: 18px;
+  z-index: 5;
 }
 
-/* MENU PAUSA */
 #pauseMenu {
   position: absolute;
   top: 40%;
@@ -53,30 +59,28 @@ body { margin: 0; overflow: hidden; }
   padding: 20px;
   display: none;
   color: white;
+  z-index: 6;
 }
 
-/* TIMER + SCORE */
+/* HUD */
 #timer {
   position: absolute;
   top: 10px;
   left: 10px;
   color: white;
   font-size: 20px;
+  z-index: 5;
 }
-
-button { margin: 5px; padding: 10px; }
 </style>
-
 </head>
+
 <body>
 
-<!-- MENU -->
 <div id="menu">
   <h1>Vocaloid Game</h1>
   <button onclick="startGame()">Play</button>
 </div>
 
-<!-- PAUSE -->
 <button id="pauseBtn" onclick="togglePause()">⏸️</button>
 
 <div id="pauseMenu">
@@ -85,10 +89,8 @@ button { margin: 5px; padding: 10px; }
   <button onclick="alert('Shop próximamente')">Shop</button>
 </div>
 
-<!-- HUD -->
 <div id="timer">Tiempo: 180 | Baguettes: 0</div>
 
-<!-- JOYSTICK -->
 <div id="joystick"><div id="stick"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
@@ -98,18 +100,26 @@ let scene, camera, renderer, player;
 let moveX = 0, moveY = 0;
 let paused = false;
 let time = 180;
-let walls = [];
-let baguettes = [];
 let score = 0;
 
-// iniciar
+let walls = [];
+let baguettes = [];
+
+/* CAMERA ROBLOX STYLE */
+let yaw = 0;
+let pitch = 0;
+let camDistance = 5;
+let isDragging = false;
+let lastX, lastY;
+
+/* START */
 function startGame() {
   document.getElementById("menu").style.display = "none";
   init();
   animate();
 }
 
-// pausa
+/* PAUSE */
 function togglePause(){
   paused = !paused;
   document.getElementById("pauseMenu").style.display = paused ? "block" : "none";
@@ -122,25 +132,24 @@ function restart(){
   location.reload();
 }
 
-// escena
+/* INIT */
 function init() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87CEEB);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-  camera.position.set(0,2,5);
 
   renderer = new THREE.WebGLRenderer();
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  let light = new THREE.DirectionalLight(0xffffff,1);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+  let light = new THREE.DirectionalLight(0xffffff, 1);
   light.position.set(5,10,5);
   scene.add(light);
 
-  let ambient = new THREE.AmbientLight(0xffffff,0.6);
-  scene.add(ambient);
-
+  /* FLOOR */
   let floor = new THREE.Mesh(
     new THREE.PlaneGeometry(50,50),
     new THREE.MeshStandardMaterial({color: 0x55aa55})
@@ -148,6 +157,7 @@ function init() {
   floor.rotation.x = -Math.PI/2;
   scene.add(floor);
 
+  /* PLAYER */
   player = new THREE.Mesh(
     new THREE.BoxGeometry(1,1,1),
     new THREE.MeshStandardMaterial({color: 0xff69b4})
@@ -155,43 +165,52 @@ function init() {
   player.position.y = 0.5;
   scene.add(player);
 
-  function createWall(x,y,z,w,h,d){
-    let wall = new THREE.Mesh(
-      new THREE.BoxGeometry(w,h,d),
-      new THREE.MeshStandardMaterial({color: 0x888888})
-    );
-    wall.position.set(x,y,z);
-    scene.add(wall);
-    walls.push(wall);
-  }
-
+  /* WALLS (con tamaño real guardado) */
   createWall(0,1,-10,20,2,1);
   createWall(0,1,10,20,2,1);
   createWall(-10,1,0,1,2,20);
   createWall(10,1,0,1,2,20);
 
+  /* BAGUETTES */
   for (let i = 0; i < 20; i++) {
-    let baguette = new THREE.Mesh(
+    let b = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2,0.2,1,8),
       new THREE.MeshStandardMaterial({color: 0xffcc66})
     );
-    baguette.rotation.z = Math.PI/2;
-    baguette.position.set(Math.random()*16-8,0.5,Math.random()*16-8);
-    scene.add(baguette);
-    baguettes.push(baguette);
+    b.rotation.z = Math.PI/2;
+    b.position.set(Math.random()*16-8,0.5,Math.random()*16-8);
+    scene.add(b);
+    baguettes.push(b);
   }
+
+  updateCamera();
 }
 
-// joystick
+/* WALL CREATION (IMPORTANTE PARA COLISIÓN REAL) */
+function createWall(x,y,z,w,h,d){
+  let wall = new THREE.Mesh(
+    new THREE.BoxGeometry(w,h,d),
+    new THREE.MeshStandardMaterial({color: 0x888888})
+  );
+
+  wall.position.set(x,y,z);
+
+  wall.userData.size = {w,h,d}; // 👈 clave para colisión real
+
+  scene.add(wall);
+  walls.push(wall);
+}
+
+/* JOYSTICK */
 let stick = document.getElementById("stick");
 let joystick = document.getElementById("joystick");
 
 joystick.addEventListener("touchmove", e => {
   let rect = joystick.getBoundingClientRect();
-  let touch = e.touches[0];
+  let t = e.touches[0];
 
-  let x = touch.clientX - rect.left - 50;
-  let y = touch.clientY - rect.top - 50;
+  let x = t.clientX - rect.left - 50;
+  let y = t.clientY - rect.top - 50;
 
   let dist = Math.sqrt(x*x + y*y);
   if (dist > 40) {
@@ -199,63 +218,84 @@ joystick.addEventListener("touchmove", e => {
     y *= 40/dist;
   }
 
-  stick.style.left = (x+50-20) + "px";
-  stick.style.top = (y+50-20) + "px";
+  stick.style.left = (x+30) + "px";
+  stick.style.top = (y+30) + "px";
 
-  moveX = x / 40;
-  moveY = y / 40;
+  moveX = x/40;
+  moveY = y/40;
 });
 
-joystick.addEventListener("touchend", () => {
-  stick.style.left = "30px";
-  stick.style.top = "30px";
-  moveX = 0;
-  moveY = 0;
+joystick.addEventListener("touchend", ()=>{
+  stick.style.left="30px";
+  stick.style.top="30px";
+  moveX=0;
+  moveY=0;
 });
 
-// cámara
-let yaw = 0;
-let pitch = 0;
-
-document.addEventListener("mousemove", e => {
-  yaw -= e.movementX * 0.002;
-  pitch -= e.movementY * 0.002;
-  pitch = Math.max(-1.5, Math.min(1.5, pitch));
+/* CAMERA ROBLOX STYLE (drag) */
+document.addEventListener("mousedown",(e)=>{
+  isDragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
 });
 
-// colisión
-function checkCollision(newX, newZ){
+document.addEventListener("mouseup",()=>{
+  isDragging = false;
+});
+
+document.addEventListener("mousemove",(e)=>{
+  if(!isDragging) return;
+
+  let dx = e.clientX - lastX;
+  let dy = e.clientY - lastY;
+
+  yaw -= dx * 0.005;
+  pitch -= dy * 0.005;
+
+  pitch = Math.max(-1.2, Math.min(1.2, pitch));
+
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
+/* COLLISION REAL */
+function checkCollision(x,z){
   for(let w of walls){
-    let dx = Math.abs(newX - w.position.x);
-    let dz = Math.abs(newZ - w.position.z);
+    let s = w.userData.size;
 
-    if(dx < 2 && dz < 2){
+    let dx = Math.abs(x - w.position.x);
+    let dz = Math.abs(z - w.position.z);
+
+    if(dx < s.w/2 + 0.5 && dz < s.d/2 + 0.5){
       return true;
     }
   }
   return false;
 }
 
-// update
-function update() {
-  if (paused) return;
+/* UPDATE */
+function update(){
+  if(paused) return;
 
-  let speed = 0.1;
-  let dirX = Math.sin(yaw);
-  let dirZ = Math.cos(yaw);
+  let speed = 0.08;
 
-  let newX = player.position.x + (dirX * moveY + dirZ * moveX) * speed;
-  let newZ = player.position.z + (dirZ * moveY - dirX * moveX) * speed;
+  let forwardX = Math.sin(yaw);
+  let forwardZ = Math.cos(yaw);
+
+  let rightX = Math.cos(yaw);
+  let rightZ = -Math.sin(yaw);
+
+  let newX = player.position.x + (forwardX*moveY + rightX*moveX)*speed;
+  let newZ = player.position.z + (forwardZ*moveY + rightZ*moveX)*speed;
 
   if(!checkCollision(newX,newZ)){
     player.position.x = newX;
     player.position.z = newZ;
   }
 
-  baguettes = baguettes.filter(b => {
-    let dist = player.position.distanceTo(b.position);
-
-    if (dist < 1) {
+  /* BAGUETTES */
+  baguettes = baguettes.filter(b=>{
+    if(player.position.distanceTo(b.position)<1){
       scene.remove(b);
       score++;
       return false;
@@ -264,29 +304,40 @@ function update() {
   });
 
   document.getElementById("timer").innerText =
-    "Tiempo: " + time + " | Baguettes: " + score;
+    "Tiempo: "+time+" | Baguettes: "+score;
 
-  camera.position.x = player.position.x - Math.sin(yaw)*5;
-  camera.position.z = player.position.z - Math.cos(yaw)*5;
-  camera.position.y = 2 + pitch*2;
+  updateCamera();
+}
+
+/* CAMERA FOLLOW (ROBLOX ORBIT) */
+function updateCamera(){
+  let offsetX = Math.sin(yaw)*camDistance;
+  let offsetZ = Math.cos(yaw)*camDistance;
+  let offsetY = 2 + pitch*2;
+
+  camera.position.set(
+    player.position.x - offsetX,
+    player.position.y + offsetY,
+    player.position.z - offsetZ
+  );
 
   camera.lookAt(player.position);
 }
 
-// tiempo
+/* TIMER */
 setInterval(()=>{
   if(!paused){
     time--;
     document.getElementById("timer").innerText =
-      "Tiempo: " + time + " | Baguettes: " + score;
+      "Tiempo: "+time+" | Baguettes: "+score;
   }
 },1000);
 
-// loop
-function animate() {
+/* LOOP */
+function animate(){
   requestAnimationFrame(animate);
   update();
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 </script>
 
