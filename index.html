@@ -9,33 +9,42 @@ body { margin:0; overflow:hidden; }
 
 #hud{
   position:absolute;
-  top:10px; left:10px;
+  top:10px;
+  left:10px;
   color:white;
   z-index:5;
 }
 
 #staminaBar{
-  width:150px;height:10px;
+  width:150px;
+  height:10px;
   background:gray;
 }
-#staminaFill{height:100%;width:100%;background:cyan;}
+#staminaFill{
+  height:100%;
+  width:100%;
+  background:cyan;
+}
 
 #joystick{
   position:absolute;
   bottom:40px;
   left:40px;
-  width:120px;height:120px;
+  width:120px;
+  height:120px;
   background:rgba(255,255,255,0.2);
   border-radius:50%;
   z-index:10;
 }
 
 #stick{
-  width:50px;height:50px;
+  width:50px;
+  height:50px;
   background:rgba(255,255,255,0.6);
   border-radius:50%;
   position:relative;
-  top:35px;left:35px;
+  top:35px;
+  left:35px;
 }
 </style>
 </head>
@@ -46,31 +55,27 @@ body { margin:0; overflow:hidden; }
 Tiempo: <span id="time">360</span><br>
 Score: <span id="score">0</span><br>
 Item: <span id="itemType">Baguette</span><br>
-
 <div id="staminaBar"><div id="staminaFill"></div></div>
 </div>
 
-<div id="joystick"><div id="stick"></div></div>
+<div id="joystick">
+  <div id="stick"></div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 
 <script>
-
 let scene,camera,renderer;
-let player;
-let yaw=0;
+let player,teto;
 
+let yaw=0;
 let joyX=0,joyY=0;
+
 let items=[];
+let npcs=[];
 
 let score=0;
 let time=360;
-let stamina=100;
-let sprint=false;
-
-let itemType="baguette";
-
-let keys={};
 
 /* INIT */
 init();
@@ -87,13 +92,13 @@ renderer=new THREE.WebGLRenderer();
 renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
-/* luz */
+/* LUZ */
 scene.add(new THREE.AmbientLight(0xffffff,0.6));
 let light=new THREE.DirectionalLight(0xffffff,1);
 light.position.set(5,10,5);
 scene.add(light);
 
-/* CIUDAD GRANDE */
+/* PISO */
 let floor=new THREE.Mesh(
 new THREE.PlaneGeometry(200,200),
 new THREE.MeshStandardMaterial({color:0x55aa55})
@@ -109,20 +114,44 @@ new THREE.MeshStandardMaterial({color:0xff69b4})
 player.position.y=1;
 scene.add(player);
 
-/* WALLS CIUDAD */
-for(let i=0;i<40;i++){
-let w=new THREE.Mesh(
-new THREE.BoxGeometry(3,3,3),
-new THREE.MeshStandardMaterial({color:0x888888})
+/* TETO */
+teto=new THREE.Group();
+
+let head=new THREE.Mesh(
+new THREE.BoxGeometry(0.8,0.8,0.8),
+new THREE.MeshStandardMaterial({color:0xffc0cb})
 );
-w.position.set(Math.random()*100-50,1.5,Math.random()*100-50);
-scene.add(w);
-}
+head.position.y=1.5;
 
-/* ITEMS (50 total) */
+let body=new THREE.Mesh(
+new THREE.BoxGeometry(0.6,0.8,0.4),
+new THREE.MeshStandardMaterial({color:0xff69b4})
+);
+body.position.y=0.8;
+
+/* PELO ROJO */
+let hair=new THREE.Mesh(
+new THREE.BoxGeometry(1.0,1.1,1.0),
+new THREE.MeshStandardMaterial({color:0xff2a2a})
+);
+hair.position.y=1.75;
+
+let bangs=new THREE.Mesh(
+new THREE.BoxGeometry(0.85,0.3,0.9),
+new THREE.MeshStandardMaterial({color:0xb00000})
+);
+bangs.position.set(0,1.55,0.1);
+
+teto.add(head);
+teto.add(body);
+teto.add(hair);
+teto.add(bangs);
+
+scene.add(teto);
+
+/* ITEMS */
 for(let i=0;i<50;i++){
-
-let color = Math.random()>0.5?0xffcc66:0x99ff99;
+let color=Math.random()>0.5?0xffcc66:0x99ff99;
 
 let item=new THREE.Mesh(
 new THREE.CylinderGeometry(0.3,0.3,1,8),
@@ -130,26 +159,57 @@ new THREE.MeshStandardMaterial({color})
 );
 
 item.position.set(Math.random()*120-60,0.5,Math.random()*120-60);
-item.userData.type = (color===0xffcc66) ? "baguette":"cebollin";
+item.userData.type=(color===0xffcc66)?"baguette":"cebollin";
 
 scene.add(item);
 items.push(item);
 }
+
+/* NPCs CON IA */
+for(let i=0;i<6;i++){
+let npc=new THREE.Mesh(
+new THREE.BoxGeometry(1,2,1),
+new THREE.MeshStandardMaterial({color:0x4444ff})
+);
+
+npc.position.set(Math.random()*100-50,1,Math.random()*100-50);
+
+npc.userData={
+  speed:0.05,
+  state:"wander",
+  dirX:Math.random()-0.5,
+  dirZ:Math.random()-0.5
+};
+
+scene.add(npc);
+npcs.push(npc);
+}
+
 }
 
 /* JOYSTICK */
 let joy=document.getElementById("joystick");
 let stick=document.getElementById("stick");
 
-joy.addEventListener("touchmove",e=>{
+function clamp(v,max){
+  return Math.max(-max,Math.min(max,v));
+}
+
+joy.addEventListener("touchmove",(e)=>{
 let t=e.touches[0];
 let r=joy.getBoundingClientRect();
 
-joyX=(t.clientX-r.left-60)/60;
-joyY=(t.clientY-r.top-60)/60;
+let x=(t.clientX-(r.left+r.width/2));
+let y=(t.clientY-(r.top+r.height/2));
 
-stick.style.left=(35+joyX*30)+"px";
-stick.style.top=(35+joyY*30)+"+" ;
+x=clamp(x,40);
+y=clamp(y,40);
+
+joyX=x/40;
+joyY=y/40;
+
+stick.style.left=(35+x)+"px";
+stick.style.top=(35+y)+"px";
 });
 
 joy.addEventListener("touchend",()=>{
@@ -158,54 +218,39 @@ stick.style.left="35px";
 stick.style.top="35px";
 });
 
-/* CAMERA ROTATION */
-document.addEventListener("mousemove",e=>{
-yaw-=e.movementX*0.003;
+/* CAMERA */
+document.addEventListener("mousemove",(e)=>{
+yaw-=e.movementX*0.002;
 });
-
-/* COLLISION SIMPLE */
-function collide(x,z){
-return false; // simplificado para ciudad grande
-}
 
 /* UPDATE */
 function update(){
 
-/* TIMER */
 time-=1/60;
 
-/* SPEED */
+/* MOVIMIENTO */
 let speed=0.15;
 
-/* MOVIMIENTO TIPO ROBLOX */
-let dx=Math.sin(yaw)*(joyY) + Math.cos(yaw)*(joyX);
-let dz=Math.cos(yaw)*(joyY) - Math.sin(yaw)*(joyX);
+let dx=Math.sin(yaw)*joyY + Math.cos(yaw)*joyX;
+let dz=Math.cos(yaw)*joyY - Math.sin(yaw)*joyX;
 
-let nx=player.position.x+dx*speed;
-let nz=player.position.z+dz*speed;
+player.position.x+=dx*speed;
+player.position.z+=dz*speed;
 
-player.position.x=nx;
-player.position.z=nz;
-
-/* CAMARA TIPO ROBLOX */
+/* CAMARA */
 camera.position.x=player.position.x-Math.sin(yaw)*6;
-camera.position.y=player.position.y+3;
+camera.position.y+=((player.position.y+3)-camera.position.y)*0.1;
 camera.position.z=player.position.z-Math.cos(yaw)*6;
-
 camera.lookAt(player.position);
 
-/* ITEMS COLLECT */
+/* ITEMS */
 items=items.filter(i=>{
-
 if(player.position.distanceTo(i.position)<2){
 
-if(i.userData.type==="baguette"){
-score+=1;
-}else{
-score+=2;
-}
-
 document.getElementById("itemType").innerText=i.userData.type;
+
+if(i.userData.type==="baguette") score++;
+else score+=2;
 
 scene.remove(i);
 return false;
@@ -213,11 +258,47 @@ return false;
 return true;
 });
 
+/* NPC IA */
+npcs.forEach(npc=>{
+
+let dist=npc.position.distanceTo(player.position);
+
+/* CAMBIAR A PERSEGUIR */
+if(dist<10){
+npc.userData.state="chase";
+}else if(dist>15){
+npc.userData.state="wander";
+}
+
+/* COMPORTAMIENTO */
+if(npc.userData.state==="chase"){
+let dirX=player.position.x-npc.position.x;
+let dirZ=player.position.z-npc.position.z;
+
+let len=Math.sqrt(dirX*dirX+dirZ*dirZ);
+
+npc.position.x+= (dirX/len)*npc.userData.speed*2;
+npc.position.z+= (dirZ/len)*npc.userData.speed*2;
+
+}else{
+npc.position.x+=npc.userData.dirX*npc.userData.speed;
+npc.position.z+=npc.userData.dirZ*npc.userData.speed;
+
+/* cambiar dirección random */
+if(Math.random()<0.01){
+npc.userData.dirX=Math.random()-0.5;
+npc.userData.dirZ=Math.random()-0.5;
+}
+}
+
+});
+
 /* HUD */
 document.getElementById("time").innerText=Math.floor(time);
 document.getElementById("score").innerText=score;
 
-document.getElementById("staminaFill").style.width=stamina+"%";
+/* TETO FOLLOW */
+teto.position.copy(player.position);
 
 }
 
@@ -227,7 +308,6 @@ requestAnimationFrame(animate);
 update();
 renderer.render(scene,camera);
 }
-
 </script>
 
 </body>
