@@ -2,11 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Roblox Style Vocaloid Game</title>
+<title>Vocaloid 3D Pro FIX</title>
 
 <style>
 body { margin:0; overflow:hidden; }
 
+/* HUD */
 #hud{
   position:absolute;
   top:10px;
@@ -15,36 +16,22 @@ body { margin:0; overflow:hidden; }
   z-index:5;
 }
 
-#staminaBar{
-  width:150px;
-  height:10px;
-  background:gray;
-}
-#staminaFill{
-  height:100%;
-  width:100%;
-  background:cyan;
-}
-
+/* JOYSTICK */
 #joystick{
   position:absolute;
   bottom:40px;
   left:40px;
-  width:120px;
-  height:120px;
+  width:120px;height:120px;
   background:rgba(255,255,255,0.2);
   border-radius:50%;
-  z-index:10;
 }
 
 #stick{
-  width:50px;
-  height:50px;
-  background:rgba(255,255,255,0.6);
+  width:50px;height:50px;
+  background:white;
   border-radius:50%;
   position:relative;
-  top:35px;
-  left:35px;
+  top:35px;left:35px;
 }
 </style>
 </head>
@@ -52,15 +39,12 @@ body { margin:0; overflow:hidden; }
 <body>
 
 <div id="hud">
-Tiempo: <span id="time">360</span><br>
-Score: <span id="score">0</span><br>
-Item: <span id="itemType">Baguette</span><br>
-<div id="staminaBar"><div id="staminaFill"></div></div>
+Tiempo: <span id="time">360</span> |
+Score: <span id="score">0</span> |
+Onions: <span id="onions">0</span>
 </div>
 
-<div id="joystick">
-  <div id="stick"></div>
-</div>
+<div id="joystick"><div id="stick"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 
@@ -69,12 +53,14 @@ let scene,camera,renderer;
 let player,teto;
 
 let yaw=0;
+
 let joyX=0,joyY=0;
 
 let items=[];
 let npcs=[];
 
 let score=0;
+let onions=0;
 let time=360;
 
 /* INIT */
@@ -131,21 +117,14 @@ body.position.y=0.8;
 
 /* PELO ROJO */
 let hair=new THREE.Mesh(
-new THREE.BoxGeometry(1.0,1.1,1.0),
+new THREE.BoxGeometry(1,1.1,1),
 new THREE.MeshStandardMaterial({color:0xff2a2a})
 );
 hair.position.y=1.75;
 
-let bangs=new THREE.Mesh(
-new THREE.BoxGeometry(0.85,0.3,0.9),
-new THREE.MeshStandardMaterial({color:0xb00000})
-);
-bangs.position.set(0,1.55,0.1);
-
 teto.add(head);
 teto.add(body);
 teto.add(hair);
-teto.add(bangs);
 
 scene.add(teto);
 
@@ -165,7 +144,7 @@ scene.add(item);
 items.push(item);
 }
 
-/* NPCs CON IA */
+/* NPCs */
 for(let i=0;i<6;i++){
 let npc=new THREE.Mesh(
 new THREE.BoxGeometry(1,2,1),
@@ -176,7 +155,6 @@ npc.position.set(Math.random()*100-50,1,Math.random()*100-50);
 
 npc.userData={
   speed:0.05,
-  state:"wander",
   dirX:Math.random()-0.5,
   dirZ:Math.random()-0.5
 };
@@ -184,29 +162,27 @@ npc.userData={
 scene.add(npc);
 npcs.push(npc);
 }
-
 }
 
 /* JOYSTICK */
 let joy=document.getElementById("joystick");
 let stick=document.getElementById("stick");
 
-function clamp(v,max){
-  return Math.max(-max,Math.min(max,v));
-}
-
 joy.addEventListener("touchmove",(e)=>{
 let t=e.touches[0];
 let r=joy.getBoundingClientRect();
 
-let x=(t.clientX-(r.left+r.width/2));
-let y=(t.clientY-(r.top+r.height/2));
+let x=t.clientX-(r.left+r.width/2);
+let y=t.clientY-(r.top+r.height/2);
 
-x=clamp(x,40);
-y=clamp(y,40);
+x=Math.max(-40,Math.min(40,x));
+y=Math.max(-40,Math.min(40,y));
 
 joyX=x/40;
 joyY=y/40;
+
+/* ROTAR CAMARA */
+yaw -= joyX * 0.05;
 
 stick.style.left=(35+x)+"px";
 stick.style.top=(35+y)+"px";
@@ -218,39 +194,38 @@ stick.style.left="35px";
 stick.style.top="35px";
 });
 
-/* CAMERA */
-document.addEventListener("mousemove",(e)=>{
-yaw-=e.movementX*0.002;
-});
-
 /* UPDATE */
 function update(){
 
 time-=1/60;
 
 /* MOVIMIENTO */
-let speed=0.15;
+let speed=0.2;
 
-let dx=Math.sin(yaw)*joyY + Math.cos(yaw)*joyX;
-let dz=Math.cos(yaw)*joyY - Math.sin(yaw)*joyX;
+let forwardX=Math.sin(yaw);
+let forwardZ=Math.cos(yaw);
+let rightX=Math.cos(yaw);
+let rightZ=-Math.sin(yaw);
 
-player.position.x+=dx*speed;
-player.position.z+=dz*speed;
+let moveX=rightX*joyX + forwardX*(-joyY);
+let moveZ=rightZ*joyX + forwardZ*(-joyY);
+
+player.position.x+=moveX*speed;
+player.position.z+=moveZ*speed;
 
 /* CAMARA */
 camera.position.x=player.position.x-Math.sin(yaw)*6;
-camera.position.y+=((player.position.y+3)-camera.position.y)*0.1;
 camera.position.z=player.position.z-Math.cos(yaw)*6;
+camera.position.y=player.position.y+3;
+
 camera.lookAt(player.position);
 
 /* ITEMS */
 items=items.filter(i=>{
-if(player.position.distanceTo(i.position)<2){
-
-document.getElementById("itemType").innerText=i.userData.type;
+if(player.position.distanceTo(i.position)<2.5){
 
 if(i.userData.type==="baguette") score++;
-else score+=2;
+else onions++;
 
 scene.remove(i);
 return false;
@@ -258,48 +233,28 @@ return false;
 return true;
 });
 
-/* NPC IA */
+/* NPCs */
 npcs.forEach(npc=>{
+let dx=player.position.x-npc.position.x;
+let dz=player.position.z-npc.position.z;
+let dist=Math.sqrt(dx*dx+dz*dz);
 
-let dist=npc.position.distanceTo(player.position);
-
-/* CAMBIAR A PERSEGUIR */
 if(dist<10){
-npc.userData.state="chase";
-}else if(dist>15){
-npc.userData.state="wander";
-}
-
-/* COMPORTAMIENTO */
-if(npc.userData.state==="chase"){
-let dirX=player.position.x-npc.position.x;
-let dirZ=player.position.z-npc.position.z;
-
-let len=Math.sqrt(dirX*dirX+dirZ*dirZ);
-
-npc.position.x+= (dirX/len)*npc.userData.speed*2;
-npc.position.z+= (dirZ/len)*npc.userData.speed*2;
-
+npc.position.x+=dx/dist*0.08;
+npc.position.z+=dz/dist*0.08;
 }else{
-npc.position.x+=npc.userData.dirX*npc.userData.speed;
-npc.position.z+=npc.userData.dirZ*npc.userData.speed;
-
-/* cambiar dirección random */
-if(Math.random()<0.01){
-npc.userData.dirX=Math.random()-0.5;
-npc.userData.dirZ=Math.random()-0.5;
+npc.position.x+=npc.userData.dirX*0.03;
+npc.position.z+=npc.userData.dirZ*0.03;
 }
-}
-
 });
 
 /* HUD */
 document.getElementById("time").innerText=Math.floor(time);
 document.getElementById("score").innerText=score;
+document.getElementById("onions").innerText=onions;
 
 /* TETO FOLLOW */
 teto.position.copy(player.position);
-
 }
 
 /* LOOP */
