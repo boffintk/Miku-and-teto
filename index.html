@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Vocaloid 3D Pro FIX</title>
+<title>Vocaloid 3D Pro FINAL</title>
 
 <style>
 body { margin:0; overflow:hidden; }
@@ -50,9 +50,11 @@ Onions: <span id="onions">0</span>
 
 <script>
 let scene,camera,renderer;
-let player,teto;
+let player,teto,miku;
 
-let yaw=0;
+let yaw=0,pitch=0;
+let isDragging=false;
+let lastX=0,lastY=0;
 
 let joyX=0,joyY=0;
 
@@ -100,33 +102,85 @@ new THREE.MeshStandardMaterial({color:0xff69b4})
 player.position.y=1;
 scene.add(player);
 
-/* TETO */
+/* ===================== */
+/* 🎀 TETO DETALLADA */
+/* ===================== */
 teto=new THREE.Group();
 
-let head=new THREE.Mesh(
+let tHead=new THREE.Mesh(
 new THREE.BoxGeometry(0.8,0.8,0.8),
 new THREE.MeshStandardMaterial({color:0xffc0cb})
 );
-head.position.y=1.5;
+tHead.position.y=1.5;
 
-let body=new THREE.Mesh(
-new THREE.BoxGeometry(0.6,0.8,0.4),
-new THREE.MeshStandardMaterial({color:0xff69b4})
-);
-body.position.y=0.8;
-
-/* PELO ROJO */
-let hair=new THREE.Mesh(
-new THREE.BoxGeometry(1,1.1,1),
+/* pelo rojo */
+let tHair=new THREE.Mesh(
+new THREE.BoxGeometry(1.1,1.1,1.1),
 new THREE.MeshStandardMaterial({color:0xff2a2a})
 );
-hair.position.y=1.75;
+tHair.position.y=1.8;
 
-teto.add(head);
-teto.add(body);
-teto.add(hair);
+/* coletas */
+let tTail1=new THREE.Mesh(
+new THREE.CylinderGeometry(0.1,0.1,1.2),
+new THREE.MeshStandardMaterial({color:0xff2a2a})
+);
+tTail1.position.set(-0.4,1.5,-0.2);
+tTail1.rotation.z=0.6;
 
+let tTail2=tTail1.clone();
+tTail2.position.x=0.4;
+
+/* cuerpo */
+let tBody=new THREE.Mesh(
+new THREE.BoxGeometry(0.7,1,0.4),
+new THREE.MeshStandardMaterial({color:0xff69b4})
+);
+tBody.position.y=0.8;
+
+teto.add(tHead,tHair,tTail1,tTail2,tBody);
 scene.add(teto);
+
+/* ===================== */
+/* 🎤 MIKU DETALLADA */
+/* ===================== */
+miku=new THREE.Group();
+
+let mHead=new THREE.Mesh(
+new THREE.BoxGeometry(0.8,0.8,0.8),
+new THREE.MeshStandardMaterial({color:0xffe0bd})
+);
+mHead.position.y=1.5;
+
+/* pelo azul */
+let mHair=new THREE.Mesh(
+new THREE.BoxGeometry(1.1,1.1,1.1),
+new THREE.MeshStandardMaterial({color:0x00ccff})
+);
+mHair.position.y=1.8;
+
+/* coletas largas */
+let mTail1=new THREE.Mesh(
+new THREE.CylinderGeometry(0.08,0.08,2),
+new THREE.MeshStandardMaterial({color:0x00ccff})
+);
+mTail1.position.set(-0.5,1.3,-0.2);
+mTail1.rotation.z=0.3;
+
+let mTail2=mTail1.clone();
+mTail2.position.x=0.5;
+
+/* cuerpo */
+let mBody=new THREE.Mesh(
+new THREE.BoxGeometry(0.7,1,0.4),
+new THREE.MeshStandardMaterial({color:0x00ffcc})
+);
+mBody.position.y=0.8;
+
+miku.add(mHead,mHair,mTail1,mTail2,mBody);
+miku.position.x=3;
+
+scene.add(miku);
 
 /* ITEMS */
 for(let i=0;i<50;i++){
@@ -142,26 +196,6 @@ item.userData.type=(color===0xffcc66)?"baguette":"cebollin";
 
 scene.add(item);
 items.push(item);
-}
-
-/* NPCs */
-for(let i=0;i<6;i++){
-let npc=new THREE.Mesh(
-new THREE.BoxGeometry(1,2,1),
-new THREE.MeshStandardMaterial({color:0x4444ff})
-);
-
-npc.position.set(Math.random()*100-50,1,Math.random()*100-50);
-
-npc.userData={
-  speed:0.05,
-  dirX:Math.random()-0.5,
-  dirZ:Math.random()-0.5
-};
-
-scene.add(npc);
-npcs.push(npc);
-}
 }
 
 /* JOYSTICK */
@@ -181,9 +215,6 @@ y=Math.max(-40,Math.min(40,y));
 joyX=x/40;
 joyY=y/40;
 
-/* ROTAR CAMARA */
-yaw -= joyX * 0.05;
-
 stick.style.left=(35+x)+"px";
 stick.style.top=(35+y)+"px";
 });
@@ -193,6 +224,31 @@ joyX=0;joyY=0;
 stick.style.left="35px";
 stick.style.top="35px";
 });
+
+/* 📷 CAMARA TOUCH */
+document.addEventListener("touchstart",(e)=>{
+isDragging=true;
+lastX=e.touches[0].clientX;
+lastY=e.touches[0].clientY;
+});
+
+document.addEventListener("touchmove",(e)=>{
+if(!isDragging) return;
+
+let dx=e.touches[0].clientX-lastX;
+let dy=e.touches[0].clientY-lastY;
+
+yaw -= dx*0.005;
+pitch -= dy*0.005;
+
+pitch=Math.max(-1.2,Math.min(1.2,pitch));
+
+lastX=e.touches[0].clientX;
+lastY=e.touches[0].clientY;
+});
+
+document.addEventListener("touchend",()=>isDragging=false);
+}
 
 /* UPDATE */
 function update(){
@@ -216,7 +272,7 @@ player.position.z+=moveZ*speed;
 /* CAMARA */
 camera.position.x=player.position.x-Math.sin(yaw)*6;
 camera.position.z=player.position.z-Math.cos(yaw)*6;
-camera.position.y=player.position.y+3;
+camera.position.y=player.position.y+3+pitch*2;
 
 camera.lookAt(player.position);
 
@@ -233,27 +289,12 @@ return false;
 return true;
 });
 
-/* NPCs */
-npcs.forEach(npc=>{
-let dx=player.position.x-npc.position.x;
-let dz=player.position.z-npc.position.z;
-let dist=Math.sqrt(dx*dx+dz*dz);
-
-if(dist<10){
-npc.position.x+=dx/dist*0.08;
-npc.position.z+=dz/dist*0.08;
-}else{
-npc.position.x+=npc.userData.dirX*0.03;
-npc.position.z+=npc.userData.dirZ*0.03;
-}
-});
-
 /* HUD */
 document.getElementById("time").innerText=Math.floor(time);
 document.getElementById("score").innerText=score;
 document.getElementById("onions").innerText=onions;
 
-/* TETO FOLLOW */
+/* FOLLOW */
 teto.position.copy(player.position);
 }
 
